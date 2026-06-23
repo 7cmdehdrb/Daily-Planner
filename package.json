@@ -6,8 +6,8 @@
   "scripts": {
     "start": "expo start",
     "start:clear": "expo start --clear",
-    "android": "expo start --android",
-    "ios": "expo start --ios",
+    "android": "expo run:android",
+    "ios": "expo run:ios",
     "web": "expo start --web",
     "typecheck": "tsc --noEmit",
     "test:core": "tsc -p tsconfig.test.json && node .tmp-tests/scripts/analysisCore.test.js && node .tmp-tests/scripts/time.test.js"
@@ -15,6 +15,7 @@
   "dependencies": {
     "@expo/vector-icons": "^15.0.3",
     "@hookform/resolvers": "^5.0.1",
+    "@react-native-community/datetimepicker": "8.4.4",
     "babel-preset-expo": "~54.0.10",
     "dayjs": "^1.11.13",
     "expo": "~54.0.0",

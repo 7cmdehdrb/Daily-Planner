@@ -1,12 +1,13 @@
 import { router, useFocusEffect } from "expo-router";
-import { useCallback, useState } from "react";
-import { Alert, Modal, Pressable, StyleSheet, Text, View } from "react-native";
+import { useCallback, useRef, useState } from "react";
+import { Alert, Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Button } from "@/components/Button";
 import { Card } from "@/components/Card";
 import { DateNavigator } from "@/components/DateNavigator";
 import { Field } from "@/components/Field";
 import { Screen } from "@/components/Screen";
+import { TimeField } from "@/components/TimeField";
 import { EditableTimeBlock, TimeTableEditor } from "@/components/TimeTableEditor";
 import { colors } from "@/constants/theme";
 import { categoryLabel, planStatusLabel } from "@/lib/labels";
@@ -67,6 +68,7 @@ export default function PlanScreen() {
   const [saveTemplateOpen, setSaveTemplateOpen] = useState(false);
   const [templateName, setTemplateName] = useState("");
   const [scrollEnabled, setScrollEnabled] = useState(true);
+  const scrollViewRef = useRef<ScrollView | null>(null);
   const isClosed = plan?.status === "closed";
   const totalPlannedMinutes = blocks.reduce((total, block) => total + minutesBetween(block.startDateTime, block.endDateTime), 0);
 
@@ -237,8 +239,13 @@ export default function PlanScreen() {
     router.push("/templates");
   };
 
+  const setTimelineScrollEnabled = (enabled: boolean) => {
+    scrollViewRef.current?.setNativeProps({ scrollEnabled: enabled });
+    setScrollEnabled(enabled);
+  };
+
   return (
-    <Screen title="하루 계획" subtitle="템플릿을 불러오고 시간표를 직접 조정합니다." scrollEnabled={scrollEnabled}>
+    <Screen title="하루 계획" subtitle="템플릿을 불러오고 시간표를 직접 조정합니다." scrollEnabled={scrollEnabled} scrollViewRef={scrollViewRef}>
       <DateNavigator />
       <Card>
         <Text style={styles.sectionTitle}>오늘 계획</Text>
@@ -261,8 +268,8 @@ export default function PlanScreen() {
         onBlockLongPress={openDraft}
         onBlockChange={moveBlock}
         onBlockDelete={removeBlock}
-        onGestureStart={() => setScrollEnabled(false)}
-        onGestureEnd={() => setScrollEnabled(true)}
+        onGestureStart={() => setTimelineScrollEnabled(false)}
+        onGestureEnd={() => setTimelineScrollEnabled(true)}
       />
 
       <BlockEditModal draft={editDraft} categories={categories} onChange={setEditDraft} onClose={() => setEditDraft(null)} onSave={saveDraft} />
@@ -302,8 +309,8 @@ function BlockEditModal({
           <Text style={styles.sectionTitle}>{draft.id ? "계획 블록 편집" : "새 계획 블록"}</Text>
           <Field label="제목" value={draft.title} onChangeText={(title) => onChange({ ...draft, title })} placeholder="TOEFL RC 문제풀이" />
           <View style={styles.timeRow}>
-            <Field label="시작" value={draft.startTime} onChangeText={(startTime) => onChange({ ...draft, startTime })} placeholder="09:00" />
-            <Field label="종료" value={draft.endTime} onChangeText={(endTime) => onChange({ ...draft, endTime })} placeholder="10:00" />
+            <TimeField label="시작" value={draft.startTime} onChange={(startTime) => onChange({ ...draft, startTime })} />
+            <TimeField label="종료" value={draft.endTime} onChange={(endTime) => onChange({ ...draft, endTime })} defaultValue="10:00" />
           </View>
           <Field label="메모" value={draft.memo} onChangeText={(memo) => onChange({ ...draft, memo })} placeholder="선택 입력" />
           <Text style={styles.label}>카테고리</Text>

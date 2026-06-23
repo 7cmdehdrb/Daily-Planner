@@ -1,4 +1,4 @@
-import { PropsWithChildren } from "react";
+import { PropsWithChildren, RefObject } from "react";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { colors } from "@/constants/theme";
@@ -7,12 +7,18 @@ type Props = PropsWithChildren<{
   title: string;
   subtitle?: string;
   scrollEnabled?: boolean;
+  scrollViewRef?: RefObject<ScrollView | null>;
 }>;
 
-export function Screen({ title, subtitle, scrollEnabled = true, children }: Props) {
+export function Screen({ title, subtitle, scrollEnabled = true, scrollViewRef, children }: Props) {
   return (
     <SafeAreaView style={styles.safe}>
-      <ScrollView contentContainerStyle={styles.content} scrollEnabled={scrollEnabled}>
+      <ScrollView
+        ref={scrollViewRef}
+        contentContainerStyle={styles.content}
+        disableScrollViewPanResponder={!scrollEnabled}
+        scrollEnabled={scrollEnabled}
+      >
         <View style={styles.header}>
           <Text style={styles.title}>{title}</Text>
           {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}

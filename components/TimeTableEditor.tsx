@@ -30,18 +30,19 @@ const minuteHeight = 1.15;
 const dayMinutes = 24 * 60;
 const minBlockMinutes = 10;
 const blockGapPx = 4;
+const resizeHandleMinMinutes = 60;
 
-const categoryColors: Record<string, string> = {
-  job: "#2563eb",
-  study: "#7c3aed",
-  exercise: "#059669",
-  hobby: "#db2777",
-  rest: "#0891b2",
-  sleep: "#475569",
-  meal: "#d97706",
-  transit: "#4f46e5",
-  chores: "#0f766e",
-  other: "#64748b",
+const categoryColors: Record<string, { accent: string; chip: string }> = {
+  job: { accent: "#4F46E5", chip: "#EEF2FF" },
+  study: { accent: "#7C3AED", chip: "#F3E8FF" },
+  exercise: { accent: "#059669", chip: "#D1FAE5" },
+  hobby: { accent: "#DB2777", chip: "#FCE7F3" },
+  rest: { accent: "#6B7280", chip: "#F3F4F6" },
+  sleep: { accent: "#334155", chip: "#E2E8F0" },
+  meal: { accent: "#D97706", chip: "#FEF3C7" },
+  transit: { accent: "#2563EB", chip: "#DBEAFE" },
+  chores: { accent: "#0F766E", chip: "#CCFBF1" },
+  other: { accent: "#64748B", chip: "#F1F5F9" },
 };
 
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
@@ -236,43 +237,70 @@ function TimeBlock({
   const rawHeight = (block.endMinute - block.startMinute) * minuteHeight;
   const top = rawTop + blockGapPx / 2;
   const height = Math.max(34, rawHeight - blockGapPx);
-  const blockColor = categoryColors[block.categoryId] ?? colors.primary;
+  const blockPalette = categoryColors[block.categoryId] ?? categoryColors.other;
+  const showResizeHandles = false;
+  const beginHandleTouch = () => {
+    onGestureStart?.();
+  };
+  const endHandleTouch = () => {
+    onGestureEnd?.();
+  };
 
   return (
-    <Pressable
-      onPress={onPress}
-      onLongPress={onLongPress}
-      delayLongPress={1000}
-      style={[styles.block, { top, height, backgroundColor: blockColor }]}
-      {...moveResponder.panHandlers}
-    >
-      <View style={styles.handleTouchTop} {...topHandleResponder.panHandlers}>
-        <View style={styles.handle} />
-      </View>
-      <View style={styles.blockHeader}>
-        <View style={styles.blockTextWrap}>
-          <View style={styles.titleRow}>
-            <Text style={styles.blockTitle} numberOfLines={1}>
-              {block.title}
-            </Text>
-            <Text style={styles.categoryPill} numberOfLines={1}>
-              {block.categoryName}
-            </Text>
+    <View style={[styles.blockFrame, { top, height }]}>
+      <Pressable
+        onPress={onPress}
+        onLongPress={onLongPress}
+        delayLongPress={1000}
+        style={styles.block}
+      >
+        <View style={[styles.categoryBar, { backgroundColor: blockPalette.accent }]} />
+        <View style={styles.blockHeader}>
+          <View style={styles.blockTextWrap}>
+            <View style={styles.titleRow}>
+              <Text style={styles.blockTitle} numberOfLines={1}>
+                {block.title}
+              </Text>
+              <Text style={[styles.categoryPill, { backgroundColor: blockPalette.chip, color: blockPalette.accent }]} numberOfLines={1}>
+                {block.categoryName}
+              </Text>
+            </View>
           </View>
+          <Pressable onPress={onDelete} hitSlop={8} style={styles.deleteButton}>
+            <Ionicons name="trash-outline" color={colors.muted} size={16} />
+          </Pressable>
         </View>
-        <Pressable onPress={onDelete} hitSlop={8} style={styles.deleteButton}>
-          <Ionicons name="trash-outline" color="#fff" size={16} />
-        </Pressable>
-      </View>
-      {height >= 58 && block.memo ? (
-        <Text style={styles.memo} numberOfLines={1}>
-          {block.memo}
-        </Text>
+        {height >= 58 && block.memo ? (
+          <Text style={styles.memo} numberOfLines={1}>
+            {block.memo}
+          </Text>
+        ) : null}
+      </Pressable>
+      {showResizeHandles ? (
+        <>
+          <View
+            pointerEvents="box-only"
+            style={styles.handleTouchTop}
+            onTouchStart={beginHandleTouch}
+            onTouchEnd={endHandleTouch}
+            onTouchCancel={endHandleTouch}
+            {...topHandleResponder.panHandlers}
+          >
+            <View pointerEvents="none" style={styles.handle} />
+          </View>
+          <View
+            pointerEvents="box-only"
+            style={styles.handleTouchBottom}
+            onTouchStart={beginHandleTouch}
+            onTouchEnd={endHandleTouch}
+            onTouchCancel={endHandleTouch}
+            {...bottomHandleResponder.panHandlers}
+          >
+            <View pointerEvents="none" style={styles.handle} />
+          </View>
+        </>
       ) : null}
-      <View style={styles.handleTouchBottom} {...bottomHandleResponder.panHandlers}>
-        <View style={styles.handle} />
-      </View>
-    </Pressable>
+    </View>
   );
 }
 
@@ -307,17 +335,38 @@ const styles = StyleSheet.create({
     flex: 1,
     height: 1,
   },
-  block: {
-    borderRadius: 8,
-    justifyContent: "center",
+  blockFrame: {
     left: 58,
-    paddingHorizontal: 9,
     position: "absolute",
     right: 10,
   },
+  block: {
+    backgroundColor: "#FFFFFF",
+    borderColor: "#E5E7EB",
+    borderRadius: 8,
+    borderWidth: 1,
+    elevation: 1,
+    flex: 1,
+    justifyContent: "center",
+    paddingLeft: 14,
+    paddingRight: 9,
+    shadowColor: "#0f172a",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+  },
+  categoryBar: {
+    borderBottomLeftRadius: 8,
+    borderTopLeftRadius: 8,
+    bottom: 0,
+    left: 0,
+    position: "absolute",
+    top: 0,
+    width: 5,
+  },
   handleTouchTop: {
     alignItems: "center",
-    height: 14,
+    height: 26,
     justifyContent: "center",
     left: 0,
     position: "absolute",
@@ -328,7 +377,7 @@ const styles = StyleSheet.create({
   handleTouchBottom: {
     alignItems: "center",
     bottom: 0,
-    height: 14,
+    height: 26,
     justifyContent: "center",
     left: 0,
     position: "absolute",
@@ -355,15 +404,13 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   blockTitle: {
-    color: "#fff",
+    color: colors.text,
     flex: 1,
     fontSize: 14,
     fontWeight: "800",
   },
   categoryPill: {
-    backgroundColor: "rgba(255,255,255,0.22)",
     borderRadius: 999,
-    color: "#fff",
     fontSize: 11,
     fontWeight: "800",
     overflow: "hidden",
@@ -371,7 +418,7 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
   },
   memo: {
-    color: "rgba(255,255,255,0.86)",
+    color: colors.muted,
     fontSize: 12,
   },
   deleteButton: {

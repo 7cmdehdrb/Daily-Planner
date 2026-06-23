@@ -1,6 +1,6 @@
 import { getDb, mapCategory, migrateLegacyDefaultCategories, seedDefaultCategories, seedDefaultTemplates } from "./db";
 import dayjs from "dayjs";
-import { combineDateAndRange, hasTimeConflict, localTimePart, nowIso } from "./time";
+import { combineDateAndRange, hasTimeConflict, localTimePart, nowIso, timeTextToMinutes } from "./time";
 import {
   ActivityLog,
   Category,
@@ -498,6 +498,9 @@ export const upsertTemplateBlock = async (
   block: Omit<TemplateBlock, "id" | "orderIndex"> & { id?: string; orderIndex?: number },
 ) => {
   const db = await getDb();
+  if (timeTextToMinutes(block.endTime) <= timeTextToMinutes(block.startTime)) {
+    throw new Error("종료 시간은 시작 시간보다 뒤여야 합니다.");
+  }
   const existing = await listTemplateBlocks(block.templateId);
   const nextRange = combineDateAndRange("2000-01-01", block.startTime, block.endTime);
   const conflicts = existing.some((item) => {

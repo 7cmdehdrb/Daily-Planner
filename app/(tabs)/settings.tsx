@@ -5,6 +5,7 @@ import { Button } from "@/components/Button";
 import { Card } from "@/components/Card";
 import { Field } from "@/components/Field";
 import { Screen } from "@/components/Screen";
+import { TimeField } from "@/components/TimeField";
 import { colors } from "@/constants/theme";
 import { cancelAllLocalNotifications, getNotificationStatus, requestNotificationPermission } from "@/lib/notifications";
 import { deleteCategory, getSetting, resetAllData, saveCategory, saveSetting } from "@/lib/repository";
@@ -262,7 +263,7 @@ export default function SettingsScreen() {
 
       <Card>
         <Text style={styles.title}>하루 기준</Text>
-        <Field label="하루 시작 시간" value={dayStartTime} onChangeText={setDayStartTime} placeholder="05:00" />
+        <TimeField label="하루 시작 시간" value={dayStartTime} onChange={setDayStartTime} defaultValue="05:00" />
         <Button title="하루 시작 시간 저장" onPress={saveDayStartTime} />
       </Card>
 

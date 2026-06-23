@@ -5,11 +5,13 @@
     "scheme": "cplan",
     "version": "1.0.0",
     "orientation": "portrait",
-    "userInterfaceStyle": "automatic",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": false,
     "ios": {
       "supportsTablet": true
     },
     "android": {
+      "package": "com.harugyeol.app",
       "adaptiveIcon": {
         "backgroundColor": "#f8fafc"
       }
@@ -17,10 +19,17 @@
     "plugins": [
       "expo-router",
       "expo-secure-store",
-      "expo-notifications"
+      "expo-notifications",
+      "@react-native-community/datetimepicker"
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "234da541-868e-4ab0-9e70-7e067af34fbb"
+      }
     }
   }
 }

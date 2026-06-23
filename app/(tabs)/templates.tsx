@@ -1,10 +1,11 @@
 import { useFocusEffect } from "expo-router";
-import { useCallback, useMemo, useState } from "react";
-import { Alert, Modal, Pressable, StyleSheet, Text, View } from "react-native";
+import { useCallback, useMemo, useRef, useState } from "react";
+import { Alert, Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { Button } from "@/components/Button";
 import { Card } from "@/components/Card";
 import { Field } from "@/components/Field";
 import { Screen } from "@/components/Screen";
+import { TimeField } from "@/components/TimeField";
 import { EditableTimeBlock, TimeTableEditor } from "@/components/TimeTableEditor";
 import { colors } from "@/constants/theme";
 import { categoryLabel } from "@/lib/labels";
@@ -54,6 +55,7 @@ export default function TemplatesScreen() {
   const [renameText, setRenameText] = useState("");
   const [draft, setDraft] = useState<TemplateDraft | null>(null);
   const [scrollEnabled, setScrollEnabled] = useState(true);
+  const scrollViewRef = useRef<ScrollView | null>(null);
 
   const selectedTemplate = templates.find((template) => template.id === selectedTemplateId) ?? null;
 
@@ -198,8 +200,13 @@ export default function TemplatesScreen() {
     await loadTemplates();
   };
 
+  const setTimelineScrollEnabled = (enabled: boolean) => {
+    scrollViewRef.current?.setNativeProps({ scrollEnabled: enabled });
+    setScrollEnabled(enabled);
+  };
+
   return (
-    <Screen title="템플릿 관리" subtitle="오늘 계획 화면에서 불러올 하루 시간표를 관리합니다." scrollEnabled={scrollEnabled}>
+    <Screen title="템플릿 관리" subtitle="오늘 계획 화면에서 불러올 하루 시간표를 관리합니다." scrollEnabled={scrollEnabled} scrollViewRef={scrollViewRef}>
       <Card>
         <Text style={styles.title}>새 템플릿</Text>
         <Field label="이름" value={newName} onChangeText={setNewName} placeholder="평일 루틴" />
@@ -244,8 +251,8 @@ export default function TemplatesScreen() {
             onBlockLongPress={openDraft}
             onBlockChange={moveBlock}
             onBlockDelete={removeBlock}
-            onGestureStart={() => setScrollEnabled(false)}
-            onGestureEnd={() => setScrollEnabled(true)}
+            onGestureStart={() => setTimelineScrollEnabled(false)}
+            onGestureEnd={() => setTimelineScrollEnabled(true)}
           />
           <TemplateBlockModal
             draft={draft}
@@ -281,8 +288,8 @@ function TemplateBlockModal({
           <Text style={styles.title}>{draft.id ? "템플릿 블록 편집" : "새 템플릿 블록"}</Text>
           <Field label="제목" value={draft.title} onChangeText={(title) => onChange({ ...draft, title })} placeholder="TOEFL RC 문제풀이" />
           <View style={styles.timeRow}>
-            <Field label="시작" value={draft.startTime} onChangeText={(startTime) => onChange({ ...draft, startTime })} placeholder="09:00" />
-            <Field label="종료" value={draft.endTime} onChangeText={(endTime) => onChange({ ...draft, endTime })} placeholder="10:00" />
+            <TimeField label="시작" value={draft.startTime} onChange={(startTime) => onChange({ ...draft, startTime })} />
+            <TimeField label="종료" value={draft.endTime} onChange={(endTime) => onChange({ ...draft, endTime })} defaultValue="10:00" />
           </View>
           <Field label="메모" value={draft.memo} onChangeText={(memo) => onChange({ ...draft, memo })} placeholder="선택 입력" />
           <Text style={styles.label}>카테고리</Text>
