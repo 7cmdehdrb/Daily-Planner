@@ -1,0 +1,13 @@
+{
+  "compilerOptions": {
+    "strict": true,
+    "module": "CommonJS",
+    "target": "ES2020",
+    "moduleResolution": "Node",
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "outDir": ".tmp-tests",
+    "types": ["node"]
+  },
+  "include": ["lib/analysisCore.ts", "lib/time.ts", "lib/types.ts", "scripts/analysisCore.test.ts", "scripts/time.test.ts"]
+}
