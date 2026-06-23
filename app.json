@@ -3,7 +3,7 @@
     "name": "하루결",
     "slug": "cplan",
     "scheme": "cplan",
-    "version": "1.0.0",
+    "version": "1.0.2",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
     "newArchEnabled": false,
