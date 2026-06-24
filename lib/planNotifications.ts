@@ -1,6 +1,14 @@
 import { cancelBlockNotifications, requestNotificationPermission, schedulePlanNotifications } from "./notifications";
-import { clearPlannedBlockNotificationIds, getDailyPlan, getSetting, listPlannedBlocks, updatePlannedBlockNotificationIds } from "./repository";
+import {
+  clearPlannedBlockNotificationIds,
+  getDailyPlan,
+  getSetting,
+  listPlannedBlocks,
+  listRecordedPlannedBlockIds,
+  updatePlannedBlockNotificationIds,
+} from "./repository";
 import { todayKey } from "./time";
+import { PlannedBlock } from "./types";
 
 const getNotificationsPaused = async () => {
   const paused = (await getSetting("notificationsPaused", "false")) === "true";
@@ -20,10 +28,21 @@ export const reschedulePlanNotifications = async (dailyPlanId: string) => {
   await clearPlannedBlockNotificationIds(dailyPlanId);
   if (await getNotificationsPaused()) return;
   const latestBlocks = await listPlannedBlocks(dailyPlanId);
-  const scheduled = await schedulePlanNotifications(latestBlocks, await getReminderLeadMinutes());
+  const recordedBlockIds = await listRecordedPlannedBlockIds(latestBlocks.map((block) => block.id));
+  const pendingBlocks = latestBlocks.filter((block) => !recordedBlockIds.has(block.id));
+  const scheduled = await schedulePlanNotifications(pendingBlocks, await getReminderLeadMinutes());
   for (const item of scheduled) {
     await updatePlannedBlockNotificationIds(item.blockId, item);
   }
+};
+
+export const cancelPlannedBlockNotification = async (block: PlannedBlock) => {
+  await cancelBlockNotifications([block]);
+  await updatePlannedBlockNotificationIds(block.id, {
+    reminderNotificationId: null,
+    startNotificationId: null,
+    endNotificationId: null,
+  });
 };
 
 export const initializePlanNotifications = async () => {

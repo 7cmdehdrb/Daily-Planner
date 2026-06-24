@@ -10,6 +10,7 @@ import { Screen } from "@/components/Screen";
 import { TimeField } from "@/components/TimeField";
 import { colors } from "@/constants/theme";
 import { categoryLabel, sortCategoriesByPriority } from "@/lib/labels";
+import { cancelPlannedBlockNotification } from "@/lib/planNotifications";
 import { deleteActivityLog, startActivity, stopActiveActivity, updateActivityLog } from "@/lib/repository";
 import { combineDateAndTime, elapsedMinutesSince, formatDuration, localTime, minutesBetween, todayKey } from "@/lib/time";
 import { activityLogEditInputSchema, manualActivityInputSchema, validationMessage } from "@/lib/validation";
@@ -70,6 +71,11 @@ export default function LoggerScreen() {
       .slice(0, 3);
   }, [isToday, now, sortedBlocks]);
   const nearestBlock = recommendedBlocks[0] ?? sortedBlocks[0] ?? null;
+  const cancelActivePlannedNotification = async () => {
+    if (!activeLog?.plannedBlockId) return;
+    const activeBlock = blocks.find((item) => item.id === activeLog.plannedBlockId);
+    if (activeBlock) await cancelPlannedBlockNotification(activeBlock);
+  };
 
   const confirmActivitySwitch = (nextTitle: string) =>
     new Promise<boolean>((resolve) => {
@@ -104,6 +110,8 @@ export default function LoggerScreen() {
     }
     if (!(await confirmActivitySwitch(block.title))) return;
     await startActivity({ date, title: block.title, categoryId: block.categoryId, plannedBlockId: block.id });
+    await cancelActivePlannedNotification();
+    await cancelPlannedBlockNotification(block);
     await refresh(date);
   };
 
@@ -120,6 +128,7 @@ export default function LoggerScreen() {
       const parsed = manualActivityInputSchema.parse({ title: manualTitle, categoryId });
       if (!(await confirmActivitySwitch(parsed.title))) return;
       await startActivity({ date, title: parsed.title, categoryId: parsed.categoryId });
+      await cancelActivePlannedNotification();
       setManualTitle("");
       setManualOpen(false);
       await refresh(date);
@@ -138,6 +147,7 @@ export default function LoggerScreen() {
       return;
     }
     const stopped = await stopActiveActivity();
+    await cancelActivePlannedNotification();
     if (!stopped) Alert.alert("진행 중인 활동 없음", "종료할 활동이 없습니다.");
     await refresh(date);
   };

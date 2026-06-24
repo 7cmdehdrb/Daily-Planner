@@ -244,6 +244,19 @@ export const listActivityLogsInRange = async (startIso: string, endIso: string):
   return rows.map(mapLog);
 };
 
+export const listRecordedPlannedBlockIds = async (blockIds: string[]): Promise<Set<string>> => {
+  if (!blockIds.length) return new Set();
+  const db = await getDb();
+  const placeholders = blockIds.map(() => "?").join(",");
+  const rows = await db.getAllAsync<{ plannedBlockId: string }>(
+    `SELECT DISTINCT plannedBlockId
+     FROM activity_logs
+     WHERE plannedBlockId IN (${placeholders})`,
+    ...blockIds,
+  );
+  return new Set(rows.map((row) => row.plannedBlockId));
+};
+
 export const getActiveLog = async (): Promise<ActivityLog | null> => {
   const db = await getDb();
   const row = await db.getFirstAsync("SELECT * FROM activity_logs WHERE endDateTime IS NULL ORDER BY startDateTime DESC LIMIT 1");

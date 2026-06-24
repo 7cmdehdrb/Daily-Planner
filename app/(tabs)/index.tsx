@@ -9,6 +9,7 @@ import { Screen } from "@/components/Screen";
 import { TextRow } from "@/components/TextRow";
 import { colors } from "@/constants/theme";
 import { APP_NAME, categoryLabel, planStatusLabel, sortCategoriesByPriority } from "@/lib/labels";
+import { cancelPlannedBlockNotification } from "@/lib/planNotifications";
 import { startActivity, stopActiveActivity } from "@/lib/repository";
 import { formatDuration, localTime, todayKey } from "@/lib/time";
 import { manualActivityInputSchema, validationMessage } from "@/lib/validation";
@@ -33,6 +34,12 @@ export default function HomeScreen() {
     }, [date, refresh]),
   );
 
+  const cancelActivePlannedNotification = async () => {
+    if (!activeLog?.plannedBlockId) return;
+    const activeBlock = blocks.find((item) => item.id === activeLog.plannedBlockId);
+    if (activeBlock) await cancelPlannedBlockNotification(activeBlock);
+  };
+
   const stop = async () => {
     if (isClosed) {
       Alert.alert("마감된 계획", "기록을 수정하려면 리뷰에서 계획을 다시 열어 주세요.");
@@ -43,6 +50,7 @@ export default function HomeScreen() {
       return;
     }
     await stopActiveActivity();
+    await cancelActivePlannedNotification();
     await refresh(date);
   };
 
@@ -58,6 +66,8 @@ export default function HomeScreen() {
     const block = blocks.find((item) => item.id === blockId);
     if (!block) return;
     await startActivity({ date, title: block.title, categoryId: block.categoryId, plannedBlockId: block.id });
+    await cancelActivePlannedNotification();
+    await cancelPlannedBlockNotification(block);
     await refresh(date);
   };
 
@@ -73,6 +83,7 @@ export default function HomeScreen() {
       }
       const parsed = manualActivityInputSchema.parse({ title: manualTitle, categoryId: manualCategoryId });
       await startActivity({ date, title: parsed.title, categoryId: parsed.categoryId });
+      await cancelActivePlannedNotification();
       setManualTitle("");
       await refresh(date);
     } catch (error) {
