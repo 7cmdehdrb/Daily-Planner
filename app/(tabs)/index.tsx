@@ -112,7 +112,7 @@ export default function HomeScreen() {
         {nextBlock ? (
           <Button title={`다음 계획 시작: ${nextBlock.title}`} onPress={() => startPlanned(nextBlock.id)} variant="secondary" disabled={!isToday || isClosed} />
         ) : null}
-        <Field label="직접 입력" value={manualTitle} onChangeText={setManualTitle} placeholder="갑자기 생긴 일" />
+        <Field label="직접 입력" value={manualTitle} onChangeText={setManualTitle} placeholder="할 일 정리" />
         <View style={styles.chips}>
           {sortedCategories.map((category) => (
             <Pressable

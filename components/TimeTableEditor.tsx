@@ -59,7 +59,7 @@ const formatMinute = (minute: number, dayStartMinute: number) => {
 export function TimeTableEditor({
   blocks,
   dayStartMinute = 5 * 60,
-  snapMinutes = 10,
+  snapMinutes = 30,
   onCreateAt,
   onBlockPress,
   onBlockLongPress,

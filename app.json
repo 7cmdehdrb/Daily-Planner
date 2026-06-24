@@ -3,16 +3,31 @@
     "name": "하루결",
     "slug": "cplan",
     "scheme": "cplan",
-    "version": "1.0.2",
+    "version": "1.0.6",
     "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/234da541-868e-4ab0-9e70-7e067af34fbb"
+    },
     "userInterfaceStyle": "light",
     "newArchEnabled": false,
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#f8fafc"
+    },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "buildNumber": "1.0.6"
     },
     "android": {
       "package": "com.harugyeol.app",
+      "versionCode": 6,
       "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#f8fafc"
       }
     },
@@ -20,10 +35,23 @@
       "expo-router",
       "expo-secure-store",
       "expo-notifications",
-      "@react-native-community/datetimepicker"
+      "@react-native-community/datetimepicker",
+      "expo-font",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 180,
+          "resizeMode": "contain",
+          "backgroundColor": "#f8fafc"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
     },
     "extra": {
       "router": {},

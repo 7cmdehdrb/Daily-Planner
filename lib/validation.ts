@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { timeTextToMinutes } from "./time";
+import { endMinutesFromDayStart, minutesFromDayStart, timeTextToMinutes } from "./time";
 
 export const timeTextSchema = z
   .string()
@@ -7,15 +7,22 @@ export const timeTextSchema = z
 
 const endAfterStart = (value: { startTime: string; endTime: string }) => timeTextToMinutes(value.endTime) > timeTextToMinutes(value.startTime);
 
+const endAfterStartInDay = (value: { startTime: string; endTime: string; dayStartTime?: string }) => {
+  const start = minutesFromDayStart(value.startTime, value.dayStartTime);
+  const end = endMinutesFromDayStart(value.endTime, value.startTime, value.dayStartTime);
+  return end > start;
+};
+
 export const planBlockInputSchema = z
   .object({
     title: z.string().trim().min(1, "제목을 입력해 주세요."),
     startTime: timeTextSchema,
     endTime: timeTextSchema,
+    dayStartTime: timeTextSchema.optional(),
     categoryId: z.string().trim().min(1, "카테고리를 선택해 주세요."),
     memo: z.string().optional(),
   })
-  .refine(endAfterStart, {
+  .refine(endAfterStartInDay, {
     message: "종료 시간은 시작 시간보다 뒤여야 합니다.",
     path: ["endTime"],
   });
@@ -25,10 +32,11 @@ export const templateBlockInputSchema = z
     title: z.string().trim().min(1, "제목을 입력해 주세요."),
     startTime: timeTextSchema,
     endTime: timeTextSchema,
+    dayStartTime: timeTextSchema.optional(),
     categoryId: z.string().trim().min(1, "카테고리를 선택해 주세요."),
     memo: z.string().optional(),
   })
-  .refine(endAfterStart, {
+  .refine(endAfterStartInDay, {
     message: "종료 시간은 시작 시간보다 뒤여야 합니다.",
     path: ["endTime"],
   });

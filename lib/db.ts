@@ -142,7 +142,7 @@ export const initDb = async () => {
       title TEXT NOT NULL,
       categoryId TEXT NOT NULL,
       memo TEXT,
-      notificationEnabled INTEGER NOT NULL DEFAULT 1,
+      notificationEnabled INTEGER NOT NULL DEFAULT 0,
       reminderNotificationId TEXT,
       startNotificationId TEXT,
       endNotificationId TEXT,
@@ -206,7 +206,7 @@ const addColumnIfMissing = async (tableName: string, columnName: string, definit
 };
 
 const migrateDb = async () => {
-  await addColumnIfMissing("planned_blocks", "notificationEnabled", "INTEGER NOT NULL DEFAULT 1");
+  await addColumnIfMissing("planned_blocks", "notificationEnabled", "INTEGER NOT NULL DEFAULT 0");
   await addColumnIfMissing("planned_blocks", "reminderNotificationId", "TEXT");
   await addColumnIfMissing("planned_blocks", "startNotificationId", "TEXT");
   await addColumnIfMissing("planned_blocks", "endNotificationId", "TEXT");

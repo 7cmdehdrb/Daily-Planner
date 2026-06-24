@@ -1,6 +1,7 @@
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useRef, useState } from "react";
-import { Alert, Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Alert, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { Button } from "@/components/Button";
 import { Card } from "@/components/Card";
@@ -54,7 +55,7 @@ const emptyDraft = (categoryId = "job"): EditDraft => ({
   endTime: "10:00",
   memo: "",
   categoryId,
-  notificationEnabled: true,
+  notificationEnabled: false,
 });
 
 const blockEndMinute = (startMinute: number, endMinute: number) => (endMinute <= startMinute ? endMinute + 24 * 60 : endMinute);
@@ -131,9 +132,9 @@ export default function PlanScreen() {
         Alert.alert("마감된 계획", "수정하려면 리뷰에서 계획을 다시 열어 주세요.");
         return;
       }
-      const parsed = planBlockInputSchema.parse(editDraft);
+      const parsed = planBlockInputSchema.parse({ ...editDraft, dayStartTime });
       const activePlan = plan ?? (await getOrCreateDailyPlan(date));
-      const range = combineDateAndRange(date, parsed.startTime, parsed.endTime);
+      const range = combineDateAndRange(date, parsed.startTime, parsed.endTime, dayStartTime);
       await upsertPlannedBlock({
         id: editDraft.id ?? undefined,
         dailyPlanId: activePlan.id,
@@ -164,6 +165,7 @@ export default function PlanScreen() {
         date,
         timeFromDayStartMinutes(startMinute, dayStartTime),
         timeFromDayStartMinutes(endMinute, dayStartTime),
+        dayStartTime,
       );
       await upsertPlannedBlock({ ...block, startDateTime: range.startDateTime, endDateTime: range.endDateTime });
       if (plan.status === "active") await reschedulePlanNotifications(plan.id);
@@ -301,18 +303,20 @@ function BlockEditModal({
   onClose: () => void;
   onSave: () => void;
 }) {
+  const insets = useSafeAreaInsets();
   if (!draft) return null;
   return (
     <Modal visible transparent animationType="slide" onRequestClose={onClose}>
-      <View style={styles.modalBackdrop}>
-        <View style={styles.modalCard}>
+      <KeyboardAvoidingView behavior="padding" enabled={Platform.OS === "ios"} style={styles.modalBackdrop}>
+        <View style={[styles.modalCard, { paddingBottom: Math.max(insets.bottom, 16) }]}>
+          <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.modalScrollContent}>
           <Text style={styles.sectionTitle}>{draft.id ? "계획 블록 편집" : "새 계획 블록"}</Text>
-          <Field label="제목" value={draft.title} onChangeText={(title) => onChange({ ...draft, title })} placeholder="TOEFL RC 문제풀이" />
+          <Field label="제목" value={draft.title} onChangeText={(title) => onChange({ ...draft, title })} placeholder="업무 정리" />
           <View style={styles.timeRow}>
             <TimeField label="시작" value={draft.startTime} onChange={(startTime) => onChange({ ...draft, startTime })} />
             <TimeField label="종료" value={draft.endTime} onChange={(endTime) => onChange({ ...draft, endTime })} defaultValue="10:00" />
           </View>
-          <Field label="메모" value={draft.memo} onChangeText={(memo) => onChange({ ...draft, memo })} placeholder="선택 입력" />
+          <Field label="메모" value={draft.memo} onChangeText={(memo) => onChange({ ...draft, memo })} placeholder="필요한 내용을 적어 주세요" />
           <Text style={styles.label}>카테고리</Text>
           <View style={styles.chips}>
             {categories.map((category) => (
@@ -327,8 +331,9 @@ function BlockEditModal({
           </Pressable>
           <Button title="저장" onPress={onSave} disabled={!draft.title.trim()} />
           <Button title="닫기" onPress={onClose} variant="secondary" />
+          </ScrollView>
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
@@ -346,10 +351,11 @@ function TemplatePickerModal({
   onManage: () => void;
   onSelect: (templateId: string) => void;
 }) {
+  const insets = useSafeAreaInsets();
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <View style={styles.modalBackdrop}>
-        <View style={styles.modalCard}>
+        <View style={[styles.modalCard, { paddingBottom: Math.max(insets.bottom, 16) }]}>
           <View style={styles.modalHeader}>
             <View>
               <Text style={styles.sectionTitle}>템플릿 불러오기</Text>
@@ -404,10 +410,12 @@ function SaveTemplateModal({
   onSaveNew: () => void;
   onOverwrite: (templateId: string) => void;
 }) {
+  const insets = useSafeAreaInsets();
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <View style={styles.modalBackdrop}>
-        <View style={styles.modalCard}>
+      <KeyboardAvoidingView behavior="padding" enabled={Platform.OS === "ios"} style={styles.modalBackdrop}>
+        <View style={[styles.modalCard, { paddingBottom: Math.max(insets.bottom, 16) }]}>
+          <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.modalScrollContent}>
           <View style={styles.modalHeader}>
             <View>
               <Text style={styles.sectionTitle}>템플릿으로 저장</Text>
@@ -418,7 +426,7 @@ function SaveTemplateModal({
               <Text style={styles.manageText}>관리</Text>
             </Pressable>
           </View>
-          <Field label="새 템플릿 이름" value={name} onChangeText={onNameChange} placeholder="평일 루틴" />
+          <Field label="새 템플릿 이름" value={name} onChangeText={onNameChange} placeholder="기본 하루 일정" />
           <Button title="새 템플릿으로 저장" onPress={onSaveNew} />
           <Text style={styles.label}>기존 템플릿에 덮어쓰기</Text>
           <View style={styles.templateList}>
@@ -434,8 +442,9 @@ function SaveTemplateModal({
             )}
           </View>
           <Button title="닫기" onPress={onClose} variant="secondary" />
+          </ScrollView>
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
@@ -472,6 +481,10 @@ const styles = StyleSheet.create({
     gap: 12,
     maxHeight: "88%",
     padding: 16,
+  },
+  modalScrollContent: {
+    gap: 12,
+    paddingBottom: 8,
   },
   modalHeader: {
     alignItems: "flex-start",

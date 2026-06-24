@@ -28,6 +28,12 @@ export const minutesFromDayStart = (time: string, dayStartTime = "05:00") => {
   return minute >= dayStart ? minute - dayStart : minute + 24 * 60 - dayStart;
 };
 
+export const endMinutesFromDayStart = (endTime: string, startTime: string, dayStartTime = "05:00") => {
+  const end = minutesFromDayStart(endTime, dayStartTime);
+  const start = minutesFromDayStart(startTime, dayStartTime);
+  return end === 0 && start > 0 ? 24 * 60 : end;
+};
+
 export const timeFromDayStartMinutes = (minutes: number, dayStartTime = "05:00") => {
   return minutesToTimeText(timeTextToMinutes(dayStartTime) + minutes);
 };
@@ -38,12 +44,23 @@ export const minutesBetween = (startIso: string, endIso?: string | null) => {
   return Math.max(0, Math.round(minutes));
 };
 
+export const elapsedMinutesSince = (startIso: string, nowMs = Date.now()) => {
+  const minutes = (nowMs - dayjs(startIso).valueOf()) / 60000;
+  return Math.max(0, Math.round(minutes));
+};
+
 export const combineDateAndTime = (date: string, time: string) => {
   const [hour, minute] = time.split(":").map(Number);
   return dayjs(date).hour(hour || 0).minute(minute || 0).second(0).millisecond(0).toDate().toISOString();
 };
 
-export const combineDateAndRange = (date: string, startTime: string, endTime: string) => {
+export const combineDateAndRange = (date: string, startTime: string, endTime: string, dayStartTime?: string) => {
+  if (dayStartTime) {
+    const dayStart = combineDateAndTime(date, dayStartTime);
+    const startDateTime = dayjs(dayStart).add(minutesFromDayStart(startTime, dayStartTime), "minute").toISOString();
+    const endDateTime = dayjs(dayStart).add(endMinutesFromDayStart(endTime, startTime, dayStartTime), "minute").toISOString();
+    return { startDateTime, endDateTime };
+  }
   const startDateTime = combineDateAndTime(date, startTime);
   let endDateTime = combineDateAndTime(date, endTime);
   if (!dayjs(endDateTime).isAfter(dayjs(startDateTime))) {

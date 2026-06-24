@@ -43,7 +43,7 @@ export const ensureNotificationChannel = async () => {
   if (Platform.OS !== "android") return;
   await Notifications.setNotificationChannelAsync("planned-blocks", {
     name: "계획 알림",
-    importance: Notifications.AndroidImportance.DEFAULT,
+    importance: Notifications.AndroidImportance.HIGH,
     vibrationPattern: [0, 250, 250, 250],
     lightColor: "#2563eb",
   });
@@ -73,7 +73,7 @@ const schedule = async (title: string, body: string, dateIso: string) => {
   const date = new Date(dateIso);
   if (date.getTime() <= Date.now()) return null;
   return Notifications.scheduleNotificationAsync({
-    content: { title, body },
+    content: { title, body, sound: true },
     trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date },
   });
 };
@@ -99,9 +99,10 @@ export const cancelBlockNotifications = async (blocks: PlannedBlock[]) => {
   }
 };
 
-export const schedulePlanNotifications = async (blocks: PlannedBlock[]) => {
+export const schedulePlanNotifications = async (blocks: PlannedBlock[], reminderLeadMinutes: number) => {
   const granted = await requestNotificationPermission();
   if (!granted) return [];
+  const leadMinutes = Math.max(0, Math.min(30, Math.round(reminderLeadMinutes)));
   const scheduled: {
     blockId: string;
     reminderNotificationId: string | null;
@@ -109,15 +110,14 @@ export const schedulePlanNotifications = async (blocks: PlannedBlock[]) => {
     endNotificationId: string | null;
   }[] = [];
   for (const block of blocks.filter((item) => item.notificationEnabled)) {
-    const before = dayjs(block.startDateTime).subtract(10, "minute").toISOString();
-    const reminderId = await schedule("곧 시작할 계획", `${block.title} 시작 10분 전입니다.`, before);
-    const startId = await schedule("계획 시작", block.title, block.startDateTime);
-    const endId = await schedule("계획 종료", block.title, block.endDateTime);
+    const date = dayjs(block.startDateTime).subtract(leadMinutes, "minute").toISOString();
+    const body = leadMinutes === 0 ? `${block.title} 일정이 지금 시작됩니다.` : `${block.title} 시작 ${leadMinutes}분 전입니다.`;
+    const reminderId = await schedule("계획 알림", body, date);
     scheduled.push({
       blockId: block.id,
       reminderNotificationId: reminderId,
-      startNotificationId: startId,
-      endNotificationId: endId,
+      startNotificationId: null,
+      endNotificationId: null,
     });
   }
   return scheduled;

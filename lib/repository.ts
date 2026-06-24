@@ -1,6 +1,6 @@
 import { getDb, mapCategory, migrateLegacyDefaultCategories, seedDefaultCategories, seedDefaultTemplates } from "./db";
 import dayjs from "dayjs";
-import { combineDateAndRange, hasTimeConflict, localTimePart, nowIso, timeTextToMinutes } from "./time";
+import { combineDateAndRange, endMinutesFromDayStart, hasTimeConflict, localTimePart, minutesFromDayStart, nowIso } from "./time";
 import {
   ActivityLog,
   Category,
@@ -146,7 +146,7 @@ export const upsertPlannedBlock = async (
     title: block.title,
     categoryId: block.categoryId,
     memo: block.memo ?? null,
-    notificationEnabled: block.notificationEnabled ?? true,
+    notificationEnabled: block.notificationEnabled ?? false,
     reminderNotificationId: null,
     startNotificationId: null,
     endNotificationId: null,
@@ -498,14 +498,15 @@ export const upsertTemplateBlock = async (
   block: Omit<TemplateBlock, "id" | "orderIndex"> & { id?: string; orderIndex?: number },
 ) => {
   const db = await getDb();
-  if (timeTextToMinutes(block.endTime) <= timeTextToMinutes(block.startTime)) {
+  const dayStartTime = await getSetting("dayStartTime", "05:00");
+  if (endMinutesFromDayStart(block.endTime, block.startTime, dayStartTime) <= minutesFromDayStart(block.startTime, dayStartTime)) {
     throw new Error("종료 시간은 시작 시간보다 뒤여야 합니다.");
   }
   const existing = await listTemplateBlocks(block.templateId);
-  const nextRange = combineDateAndRange("2000-01-01", block.startTime, block.endTime);
+  const nextRange = combineDateAndRange("2000-01-01", block.startTime, block.endTime, dayStartTime);
   const conflicts = existing.some((item) => {
     if (block.id && item.id === block.id) return false;
-    const itemRange = combineDateAndRange("2000-01-01", item.startTime, item.endTime);
+    const itemRange = combineDateAndRange("2000-01-01", item.startTime, item.endTime, dayStartTime);
     return hasTimeConflict(nextRange.startDateTime, nextRange.endDateTime, [
       {
         id: item.id,
@@ -556,9 +557,10 @@ export const applyTemplateToPlan = async (templateId: string, date: string) => {
   const db = await getDb();
   const plan = await getOrCreateDailyPlan(date);
   const blocks = await listTemplateBlocks(templateId);
+  const dayStartTime = await getSetting("dayStartTime", "05:00");
   await db.runAsync("DELETE FROM planned_blocks WHERE dailyPlanId = ?", plan.id);
   for (const [index, block] of blocks.entries()) {
-    const range = combineDateAndRange(date, block.startTime, block.endTime);
+    const range = combineDateAndRange(date, block.startTime, block.endTime, dayStartTime);
     await upsertPlannedBlock({
       id: id(`block-${index}`),
       dailyPlanId: plan.id,
@@ -567,7 +569,7 @@ export const applyTemplateToPlan = async (templateId: string, date: string) => {
       title: block.title,
       categoryId: block.categoryId,
       memo: block.memo,
-      notificationEnabled: true,
+      notificationEnabled: false,
     });
   }
   await db.runAsync("UPDATE daily_plans SET sourceTemplateId = ?, status = ?, updatedAt = ? WHERE id = ?", templateId, "draft", nowIso(), plan.id);

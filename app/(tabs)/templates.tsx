@@ -158,7 +158,7 @@ export default function TemplatesScreen() {
   const saveDraft = async () => {
     if (!draft || !selectedTemplateId) return;
     try {
-      const parsed = templateBlockInputSchema.parse(draft);
+      const parsed = templateBlockInputSchema.parse({ ...draft, dayStartTime });
       const current = blocks.find((block) => block.id === draft.id);
       await upsertTemplateBlock({
         id: draft.id ?? undefined,
@@ -209,7 +209,7 @@ export default function TemplatesScreen() {
     <Screen title="템플릿 관리" subtitle="오늘 계획 화면에서 불러올 하루 시간표를 관리합니다." scrollEnabled={scrollEnabled} scrollViewRef={scrollViewRef}>
       <Card>
         <Text style={styles.title}>새 템플릿</Text>
-        <Field label="이름" value={newName} onChangeText={setNewName} placeholder="평일 루틴" />
+        <Field label="이름" value={newName} onChangeText={setNewName} placeholder="기본 하루 일정" />
         <Button title="빈 템플릿 만들기" onPress={createBlankTemplate} disabled={!newName.trim()} />
       </Card>
 
@@ -286,12 +286,12 @@ function TemplateBlockModal({
       <View style={styles.modalBackdrop}>
         <View style={styles.modalCard}>
           <Text style={styles.title}>{draft.id ? "템플릿 블록 편집" : "새 템플릿 블록"}</Text>
-          <Field label="제목" value={draft.title} onChangeText={(title) => onChange({ ...draft, title })} placeholder="TOEFL RC 문제풀이" />
+          <Field label="제목" value={draft.title} onChangeText={(title) => onChange({ ...draft, title })} placeholder="업무 정리" />
           <View style={styles.timeRow}>
             <TimeField label="시작" value={draft.startTime} onChange={(startTime) => onChange({ ...draft, startTime })} />
             <TimeField label="종료" value={draft.endTime} onChange={(endTime) => onChange({ ...draft, endTime })} defaultValue="10:00" />
           </View>
-          <Field label="메모" value={draft.memo} onChangeText={(memo) => onChange({ ...draft, memo })} placeholder="선택 입력" />
+          <Field label="메모" value={draft.memo} onChangeText={(memo) => onChange({ ...draft, memo })} placeholder="필요한 내용을 적어 주세요" />
           <Text style={styles.label}>카테고리</Text>
           <View style={styles.chips}>
             {categories.map((category) => (

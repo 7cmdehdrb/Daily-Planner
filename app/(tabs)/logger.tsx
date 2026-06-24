@@ -1,5 +1,7 @@
-import { Alert, Modal, Pressable, StyleSheet, Text, View } from "react-native";
-import { useEffect, useMemo, useState } from "react";
+import { Alert, Animated, AppState, Easing, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useFocusEffect } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Button } from "@/components/Button";
 import { Card } from "@/components/Card";
 import { DateNavigator } from "@/components/DateNavigator";
@@ -9,7 +11,7 @@ import { TimeField } from "@/components/TimeField";
 import { colors } from "@/constants/theme";
 import { categoryLabel, sortCategoriesByPriority } from "@/lib/labels";
 import { deleteActivityLog, startActivity, stopActiveActivity, updateActivityLog } from "@/lib/repository";
-import { combineDateAndTime, formatDuration, localTime, minutesBetween, todayKey } from "@/lib/time";
+import { combineDateAndTime, elapsedMinutesSince, formatDuration, localTime, minutesBetween, todayKey } from "@/lib/time";
 import { activityLogEditInputSchema, manualActivityInputSchema, validationMessage } from "@/lib/validation";
 import { ActivityLog, PlannedBlock } from "@/lib/types";
 import { useAppStore } from "@/store/appStore";
@@ -30,9 +32,29 @@ export default function LoggerScreen() {
   const [now, setNow] = useState(Date.now());
 
   useEffect(() => {
-    const timer = setInterval(() => setNow(Date.now()), 30000);
+    const syncNow = () => setNow(Date.now());
+    syncNow();
+    const timer = setInterval(syncNow, activeLog ? 1000 : 30000);
+    const subscription = AppState.addEventListener("change", (state) => {
+      if (state === "active") syncNow();
+    });
+    return () => {
+      clearInterval(timer);
+      subscription.remove();
+    };
+  }, [activeLog]);
+
+  useFocusEffect(
+    useCallback(() => {
+      setNow(Date.now());
+    }, []),
+  );
+
+  useEffect(() => {
+    if (!activeLog) return;
+    const timer = setInterval(() => refresh(date), 60000);
     return () => clearInterval(timer);
-  }, []);
+  }, [activeLog, date, refresh]);
 
   const sortedCategories = useMemo(() => sortCategoriesByPriority(categories), [categories]);
   const categoryById = useMemo(() => new Map(categories.map((category) => [category.id, category])), [categories]);
@@ -49,6 +71,22 @@ export default function LoggerScreen() {
   }, [isToday, now, sortedBlocks]);
   const nearestBlock = recommendedBlocks[0] ?? sortedBlocks[0] ?? null;
 
+  const confirmActivitySwitch = (nextTitle: string) =>
+    new Promise<boolean>((resolve) => {
+      if (!activeLog) {
+        resolve(true);
+        return;
+      }
+      Alert.alert(
+        "진행 중인 기록 변경",
+        `"${activeLog.title}" 기록이 종료되고 "${nextTitle}" 기록이 시작됩니다. 계속할까요?`,
+        [
+          { text: "취소", style: "cancel", onPress: () => resolve(false) },
+          { text: "시작", style: "destructive", onPress: () => resolve(true) },
+        ],
+      );
+    });
+
   const startPlanned = async (blockId: string) => {
     if (isClosed) {
       Alert.alert("마감된 계획", "기록하려면 리뷰에서 계획을 다시 열어 주세요.");
@@ -60,6 +98,11 @@ export default function LoggerScreen() {
     }
     const block = blocks.find((item) => item.id === blockId);
     if (!block) return;
+    if (activeLog?.plannedBlockId === block.id) {
+      Alert.alert("이미 기록 중", `"${block.title}" 활동을 이미 기록하고 있습니다.`);
+      return;
+    }
+    if (!(await confirmActivitySwitch(block.title))) return;
     await startActivity({ date, title: block.title, categoryId: block.categoryId, plannedBlockId: block.id });
     await refresh(date);
   };
@@ -75,6 +118,7 @@ export default function LoggerScreen() {
         return;
       }
       const parsed = manualActivityInputSchema.parse({ title: manualTitle, categoryId });
+      if (!(await confirmActivitySwitch(parsed.title))) return;
       await startActivity({ date, title: parsed.title, categoryId: parsed.categoryId });
       setManualTitle("");
       setManualOpen(false);
@@ -142,7 +186,7 @@ export default function LoggerScreen() {
     }
   };
 
-  const activeMinutes = activeLog ? Math.max(0, Math.round((now - new Date(activeLog.startDateTime).getTime()) / 60000)) : 0;
+  const activeMinutes = activeLog ? elapsedMinutesSince(activeLog.startDateTime, now) : 0;
 
   return (
     <Screen title="활동 기록" subtitle="지금 하는 활동을 빠르게 시작하고 종료합니다.">
@@ -211,7 +255,9 @@ export default function LoggerScreen() {
                   {localTime(log.startDateTime)}-{log.endDateTime ? localTime(log.endDateTime) : "진행 중"}
                 </Text>
               </View>
-              <Text style={styles.logDuration}>{formatDuration(minutesBetween(log.startDateTime, log.endDateTime ?? new Date().toISOString()))}</Text>
+              <Text style={styles.logDuration}>
+                {formatDuration(log.endDateTime ? minutesBetween(log.startDateTime, log.endDateTime) : elapsedMinutesSince(log.startDateTime, now))}
+              </Text>
             </Pressable>
           ))
         ) : (
@@ -274,6 +320,39 @@ function CurrentActivityCard({
   onStartNearest: () => void;
   onDirectStart: () => void;
 }) {
+  const flow = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (!activeLog) {
+      flow.stopAnimation();
+      flow.setValue(0);
+      return;
+    }
+    const loop = Animated.loop(
+      Animated.timing(flow, {
+        toValue: 1,
+        duration: 1800,
+        easing: Easing.inOut(Easing.quad),
+        useNativeDriver: true,
+      }),
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [activeLog, flow]);
+
+  const spin = flow.interpolate({
+    inputRange: [0, 1],
+    outputRange: ["0deg", "360deg"],
+  });
+  const pulseOpacity = flow.interpolate({
+    inputRange: [0, 0.5, 1],
+    outputRange: [0.35, 1, 0.35],
+  });
+  const pulseScale = flow.interpolate({
+    inputRange: [0, 0.5, 1],
+    outputRange: [0.45, 1, 0.45],
+  });
+
   return (
     <Card>
       <Text style={styles.eyebrow}>Current Activity</Text>
@@ -281,7 +360,18 @@ function CurrentActivityCard({
         <>
           <Text style={styles.currentTitle}>{activeLog.title}</Text>
           <Text style={styles.currentMeta}>{localTime(activeLog.startDateTime)} 시작</Text>
-          <Text style={styles.elapsed}>{formatDuration(activeMinutes)}</Text>
+          <View style={styles.elapsedRow}>
+            <Animated.View style={[styles.timeOrb, { transform: [{ rotate: spin }] }]}>
+              <View style={styles.timeOrbHand} />
+            </Animated.View>
+            <View style={styles.elapsedTextBlock}>
+              <Text style={styles.elapsed}>{formatDuration(activeMinutes)}</Text>
+              <Text style={styles.flowCaption}>기록 중</Text>
+            </View>
+          </View>
+          <View style={styles.flowTrack}>
+            <Animated.View style={[styles.flowFill, { opacity: pulseOpacity, transform: [{ scaleX: pulseScale }] }]} />
+          </View>
           <Button title="종료하기" onPress={onStop} variant="danger" style={styles.heroButton} disabled={!isToday || isClosed} />
         </>
       ) : (
@@ -355,17 +445,20 @@ function ManualStartSheet({
   onStart: () => void;
   disabled?: boolean;
 }) {
+  const insets = useSafeAreaInsets();
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <View style={styles.sheetBackdrop}>
-        <View style={styles.sheet}>
+      <KeyboardAvoidingView behavior="padding" enabled={Platform.OS === "ios"} style={styles.sheetBackdrop}>
+        <View style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, 16) }]}>
+          <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.sheetContent}>
           <Text style={styles.title}>직접 활동 시작</Text>
-          <Field label="활동 이름" value={title} onChangeText={onTitleChange} placeholder="갑자기 생긴 일" />
+          <Field label="활동 이름" value={title} onChangeText={onTitleChange} placeholder="할 일 정리" />
           <CategoryChips categories={categories} selectedId={categoryId} onSelect={onCategoryChange} />
           <Button title="시작하기" onPress={onStart} disabled={disabled} />
           <Button title="닫기" onPress={onClose} variant="secondary" />
+          </ScrollView>
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
@@ -399,10 +492,12 @@ function EditLogSheet({
   onSave: () => void;
   onDelete: () => void;
 }) {
+  const insets = useSafeAreaInsets();
   return (
     <Modal visible={!!log} transparent animationType="slide" onRequestClose={onClose}>
-      <View style={styles.sheetBackdrop}>
-        <View style={styles.sheet}>
+      <KeyboardAvoidingView behavior="padding" enabled={Platform.OS === "ios"} style={styles.sheetBackdrop}>
+        <View style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, 16) }]}>
+          <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.sheetContent}>
           <Text style={styles.title}>기록 수정</Text>
           <Field label="제목" value={title} onChangeText={onTitleChange} />
           <View style={styles.editTimeStack}>
@@ -413,8 +508,9 @@ function EditLogSheet({
           <Button title="기록 저장" onPress={onSave} disabled={!title.trim()} />
           <Button title="기록 삭제" onPress={onDelete} variant="danger" />
           <Button title="닫기" onPress={onClose} variant="secondary" />
+          </ScrollView>
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
@@ -464,6 +560,47 @@ const styles = StyleSheet.create({
     color: colors.text,
     fontSize: 34,
     fontWeight: "900",
+  },
+  elapsedRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 12,
+  },
+  elapsedTextBlock: {
+    flex: 1,
+  },
+  flowCaption: {
+    color: colors.muted,
+    fontSize: 12,
+    fontWeight: "800",
+  },
+  timeOrb: {
+    alignItems: "center",
+    borderColor: colors.primary,
+    borderRadius: 18,
+    borderRightColor: colors.line,
+    borderWidth: 3,
+    height: 36,
+    justifyContent: "center",
+    width: 36,
+  },
+  timeOrbHand: {
+    backgroundColor: colors.primary,
+    borderRadius: 2,
+    height: 13,
+    width: 3,
+  },
+  flowTrack: {
+    backgroundColor: colors.chip,
+    borderRadius: 999,
+    height: 7,
+    overflow: "hidden",
+  },
+  flowFill: {
+    backgroundColor: colors.primary,
+    borderRadius: 999,
+    height: 7,
+    width: "100%",
   },
   heroButton: {
     minHeight: 52,
@@ -579,5 +716,9 @@ const styles = StyleSheet.create({
     gap: 12,
     maxHeight: "88%",
     padding: 16,
+  },
+  sheetContent: {
+    gap: 12,
+    paddingBottom: 8,
   },
 });

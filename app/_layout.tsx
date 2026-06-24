@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { Stack } from "expo-router";
-import { ActivityIndicator, Pressable, Text, View } from "react-native";
+import { ActivityIndicator, Image, Pressable, Text, View } from "react-native";
 import { colors } from "@/constants/theme";
+import { initializePlanNotifications } from "@/lib/planNotifications";
 import { useAppStore } from "@/store/appStore";
 
 export default function RootLayout() {
@@ -16,6 +17,13 @@ export default function RootLayout() {
       setInitError(message);
     });
   }, [init]);
+
+  useEffect(() => {
+    if (!ready) return;
+    initializePlanNotifications().catch((error) => {
+      console.warn("Notification initialization failed", error);
+    });
+  }, [ready]);
 
   if (initError) {
     return (
@@ -41,7 +49,8 @@ export default function RootLayout() {
 
   if (!ready) {
     return (
-      <View style={{ alignItems: "center", backgroundColor: colors.bg, flex: 1, justifyContent: "center" }}>
+      <View style={{ alignItems: "center", backgroundColor: colors.bg, flex: 1, gap: 18, justifyContent: "center" }}>
+        <Image source={require("../assets/splash-icon.png")} style={{ height: 128, width: 128 }} resizeMode="contain" />
         <ActivityIndicator color={colors.primary} size="large" />
       </View>
     );
