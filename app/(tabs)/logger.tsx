@@ -1,4 +1,4 @@
-import { Alert, Animated, AppState, Easing, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Alert, Animated, AppState, Easing, Keyboard, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useFocusEffect } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -10,12 +10,33 @@ import { Screen } from "@/components/Screen";
 import { TimeField } from "@/components/TimeField";
 import { colors } from "@/constants/theme";
 import { categoryLabel, sortCategoriesByPriority } from "@/lib/labels";
+import { dismissActiveActivityNotification, showActiveActivityNotification } from "@/lib/notifications";
 import { cancelPlannedBlockNotification } from "@/lib/planNotifications";
 import { deleteActivityLog, startActivity, stopActiveActivity, updateActivityLog } from "@/lib/repository";
 import { combineDateAndTime, elapsedMinutesSince, formatDuration, localTime, minutesBetween, todayKey } from "@/lib/time";
 import { activityLogEditInputSchema, manualActivityInputSchema, validationMessage } from "@/lib/validation";
 import { ActivityLog, PlannedBlock } from "@/lib/types";
 import { useAppStore } from "@/store/appStore";
+
+const useAndroidKeyboardInset = () => {
+  const [keyboardInset, setKeyboardInset] = useState(0);
+
+  useEffect(() => {
+    if (Platform.OS !== "android") return;
+    const show = Keyboard.addListener("keyboardDidShow", (event) => {
+      setKeyboardInset(event.endCoordinates.height);
+    });
+    const hide = Keyboard.addListener("keyboardDidHide", () => {
+      setKeyboardInset(0);
+    });
+    return () => {
+      show.remove();
+      hide.remove();
+    };
+  }, []);
+
+  return keyboardInset;
+};
 
 export default function LoggerScreen() {
   const { date, plan, blocks, activeLog, logs, categories, refresh } = useAppStore();
@@ -109,9 +130,10 @@ export default function LoggerScreen() {
       return;
     }
     if (!(await confirmActivitySwitch(block.title))) return;
-    await startActivity({ date, title: block.title, categoryId: block.categoryId, plannedBlockId: block.id });
+    const log = await startActivity({ date, title: block.title, categoryId: block.categoryId, plannedBlockId: block.id });
     await cancelActivePlannedNotification();
     await cancelPlannedBlockNotification(block);
+    await showActiveActivityNotification(log);
     await refresh(date);
   };
 
@@ -127,8 +149,9 @@ export default function LoggerScreen() {
       }
       const parsed = manualActivityInputSchema.parse({ title: manualTitle, categoryId });
       if (!(await confirmActivitySwitch(parsed.title))) return;
-      await startActivity({ date, title: parsed.title, categoryId: parsed.categoryId });
+      const log = await startActivity({ date, title: parsed.title, categoryId: parsed.categoryId });
       await cancelActivePlannedNotification();
+      await showActiveActivityNotification(log);
       setManualTitle("");
       setManualOpen(false);
       await refresh(date);
@@ -148,6 +171,7 @@ export default function LoggerScreen() {
     }
     const stopped = await stopActiveActivity();
     await cancelActivePlannedNotification();
+    if (stopped) await dismissActiveActivityNotification();
     if (!stopped) Alert.alert("진행 중인 활동 없음", "종료할 활동이 없습니다.");
     await refresh(date);
   };
@@ -456,10 +480,22 @@ function ManualStartSheet({
   disabled?: boolean;
 }) {
   const insets = useSafeAreaInsets();
+  const keyboardInset = useAndroidKeyboardInset();
+  const { height: windowHeight } = useWindowDimensions();
+  const sheetMaxHeight = keyboardInset ? windowHeight - keyboardInset - Math.max(insets.top, 12) - 12 : windowHeight * 0.88;
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <KeyboardAvoidingView behavior="padding" enabled={Platform.OS === "ios"} style={styles.sheetBackdrop}>
-        <View style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, 16) }]}>
+        <View
+          style={[
+            styles.sheet,
+            {
+              marginBottom: Platform.OS === "android" ? keyboardInset : 0,
+              maxHeight: sheetMaxHeight,
+              paddingBottom: Math.max(insets.bottom, 16),
+            },
+          ]}
+        >
           <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.sheetContent}>
           <Text style={styles.title}>직접 활동 시작</Text>
           <Field label="활동 이름" value={title} onChangeText={onTitleChange} placeholder="할 일 정리" />
@@ -503,10 +539,22 @@ function EditLogSheet({
   onDelete: () => void;
 }) {
   const insets = useSafeAreaInsets();
+  const keyboardInset = useAndroidKeyboardInset();
+  const { height: windowHeight } = useWindowDimensions();
+  const sheetMaxHeight = keyboardInset ? windowHeight - keyboardInset - Math.max(insets.top, 12) - 12 : windowHeight * 0.88;
   return (
     <Modal visible={!!log} transparent animationType="slide" onRequestClose={onClose}>
       <KeyboardAvoidingView behavior="padding" enabled={Platform.OS === "ios"} style={styles.sheetBackdrop}>
-        <View style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, 16) }]}>
+        <View
+          style={[
+            styles.sheet,
+            {
+              marginBottom: Platform.OS === "android" ? keyboardInset : 0,
+              maxHeight: sheetMaxHeight,
+              paddingBottom: Math.max(insets.bottom, 16),
+            },
+          ]}
+        >
           <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.sheetContent}>
           <Text style={styles.title}>기록 수정</Text>
           <Field label="제목" value={title} onChangeText={onTitleChange} />

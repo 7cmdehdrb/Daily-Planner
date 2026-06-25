@@ -1,6 +1,6 @@
 import { router, useFocusEffect } from "expo-router";
-import { useCallback, useRef, useState } from "react";
-import { Alert, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Alert, Keyboard, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { Button } from "@/components/Button";
@@ -59,6 +59,26 @@ const emptyDraft = (categoryId = "job"): EditDraft => ({
 });
 
 const blockEndMinute = (startMinute: number, endMinute: number) => (endMinute <= startMinute ? endMinute + 24 * 60 : endMinute);
+
+const useAndroidKeyboardInset = () => {
+  const [keyboardInset, setKeyboardInset] = useState(0);
+
+  useEffect(() => {
+    if (Platform.OS !== "android") return;
+    const show = Keyboard.addListener("keyboardDidShow", (event) => {
+      setKeyboardInset(event.endCoordinates.height);
+    });
+    const hide = Keyboard.addListener("keyboardDidHide", () => {
+      setKeyboardInset(0);
+    });
+    return () => {
+      show.remove();
+      hide.remove();
+    };
+  }, []);
+
+  return keyboardInset;
+};
 
 export default function PlanScreen() {
   const { date, plan, blocks, categories, refresh } = useAppStore();
@@ -304,11 +324,23 @@ function BlockEditModal({
   onSave: () => void;
 }) {
   const insets = useSafeAreaInsets();
+  const keyboardInset = useAndroidKeyboardInset();
+  const { height: windowHeight } = useWindowDimensions();
+  const cardMaxHeight = keyboardInset ? windowHeight - keyboardInset - Math.max(insets.top, 12) - 12 : windowHeight * 0.88;
   if (!draft) return null;
   return (
     <Modal visible transparent animationType="slide" onRequestClose={onClose}>
       <KeyboardAvoidingView behavior="padding" enabled={Platform.OS === "ios"} style={styles.modalBackdrop}>
-        <View style={[styles.modalCard, { paddingBottom: Math.max(insets.bottom, 16) }]}>
+        <View
+          style={[
+            styles.modalCard,
+            {
+              marginBottom: Platform.OS === "android" ? keyboardInset : 0,
+              maxHeight: cardMaxHeight,
+              paddingBottom: Math.max(insets.bottom, 16),
+            },
+          ]}
+        >
           <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.modalScrollContent}>
           <Text style={styles.sectionTitle}>{draft.id ? "계획 블록 편집" : "새 계획 블록"}</Text>
           <Field label="제목" value={draft.title} onChangeText={(title) => onChange({ ...draft, title })} placeholder="업무 정리" />
@@ -411,10 +443,22 @@ function SaveTemplateModal({
   onOverwrite: (templateId: string) => void;
 }) {
   const insets = useSafeAreaInsets();
+  const keyboardInset = useAndroidKeyboardInset();
+  const { height: windowHeight } = useWindowDimensions();
+  const cardMaxHeight = keyboardInset ? windowHeight - keyboardInset - Math.max(insets.top, 12) - 12 : windowHeight * 0.88;
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <KeyboardAvoidingView behavior="padding" enabled={Platform.OS === "ios"} style={styles.modalBackdrop}>
-        <View style={[styles.modalCard, { paddingBottom: Math.max(insets.bottom, 16) }]}>
+        <View
+          style={[
+            styles.modalCard,
+            {
+              marginBottom: Platform.OS === "android" ? keyboardInset : 0,
+              maxHeight: cardMaxHeight,
+              paddingBottom: Math.max(insets.bottom, 16),
+            },
+          ]}
+        >
           <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.modalScrollContent}>
           <View style={styles.modalHeader}>
             <View>

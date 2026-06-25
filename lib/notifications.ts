@@ -1,7 +1,7 @@
 import Constants, { ExecutionEnvironment } from "expo-constants";
 import dayjs from "dayjs";
 import { Platform } from "react-native";
-import { PlannedBlock } from "./types";
+import { ActivityLog, PlannedBlock } from "./types";
 
 type NotificationsModule = typeof import("expo-notifications");
 
@@ -14,12 +14,15 @@ const getNotifications = async () => {
   try {
     notificationsModule = await import("expo-notifications");
     notificationsModule.setNotificationHandler({
-      handleNotification: async () => ({
-        shouldShowBanner: true,
-        shouldShowList: true,
-        shouldPlaySound: true,
-        shouldSetBadge: false,
-      }),
+      handleNotification: async (notification) => {
+        const isActiveActivity = notification.request.content.data?.kind === "active-activity";
+        return {
+          shouldShowBanner: !isActiveActivity,
+          shouldShowList: true,
+          shouldPlaySound: !isActiveActivity,
+          shouldSetBadge: false,
+        };
+      },
     });
   } catch {
     notificationsModule = null;
@@ -82,6 +85,39 @@ export const cancelAllLocalNotifications = async () => {
   const Notifications = await getNotifications();
   if (!Notifications) return;
   await Notifications.cancelAllScheduledNotificationsAsync();
+};
+
+const activeActivityNotificationId = "active-activity-notification";
+
+export const showActiveActivityNotification = async (log: ActivityLog) => {
+  const granted = await requestNotificationPermission();
+  if (!granted) return null;
+  const Notifications = await getNotifications();
+  if (!Notifications || Platform.OS !== "android") return null;
+  await Notifications.dismissNotificationAsync(activeActivityNotificationId).catch(() => undefined);
+  return Notifications.scheduleNotificationAsync({
+    identifier: activeActivityNotificationId,
+    content: {
+      title: "활동 기록 중",
+      body: `${log.title} · ${dayjs(log.startDateTime).format("HH:mm")} 시작`,
+      sound: false,
+      sticky: true,
+      autoDismiss: false,
+      priority: Notifications.AndroidNotificationPriority.DEFAULT,
+      color: "#2563eb",
+      data: {
+        kind: "active-activity",
+        activityLogId: log.id,
+      },
+    },
+    trigger: null,
+  });
+};
+
+export const dismissActiveActivityNotification = async () => {
+  const Notifications = await getNotifications();
+  if (!Notifications || Platform.OS !== "android") return;
+  await Notifications.dismissNotificationAsync(activeActivityNotificationId).catch(() => undefined);
 };
 
 export const cancelBlockNotifications = async (blocks: PlannedBlock[]) => {

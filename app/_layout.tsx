@@ -2,11 +2,13 @@ import { useEffect, useState } from "react";
 import { Stack } from "expo-router";
 import { ActivityIndicator, Image, Pressable, Text, View } from "react-native";
 import { colors } from "@/constants/theme";
+import { dismissActiveActivityNotification, showActiveActivityNotification } from "@/lib/notifications";
 import { initializePlanNotifications } from "@/lib/planNotifications";
 import { useAppStore } from "@/store/appStore";
 
 export default function RootLayout() {
   const ready = useAppStore((state) => state.ready);
+  const activeLog = useAppStore((state) => state.activeLog);
   const init = useAppStore((state) => state.init);
   const [initError, setInitError] = useState<string | null>(null);
 
@@ -24,6 +26,14 @@ export default function RootLayout() {
       console.warn("Notification initialization failed", error);
     });
   }, [ready]);
+
+  useEffect(() => {
+    if (!ready) return;
+    const sync = activeLog ? showActiveActivityNotification(activeLog) : dismissActiveActivityNotification();
+    sync.catch((error) => {
+      console.warn("Active activity notification sync failed", error);
+    });
+  }, [activeLog, ready]);
 
   if (initError) {
     return (

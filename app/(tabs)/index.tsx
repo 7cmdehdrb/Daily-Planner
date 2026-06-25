@@ -9,6 +9,7 @@ import { Screen } from "@/components/Screen";
 import { TextRow } from "@/components/TextRow";
 import { colors } from "@/constants/theme";
 import { APP_NAME, categoryLabel, planStatusLabel, sortCategoriesByPriority } from "@/lib/labels";
+import { dismissActiveActivityNotification, showActiveActivityNotification } from "@/lib/notifications";
 import { cancelPlannedBlockNotification } from "@/lib/planNotifications";
 import { startActivity, stopActiveActivity } from "@/lib/repository";
 import { formatDuration, localTime, todayKey } from "@/lib/time";
@@ -51,6 +52,7 @@ export default function HomeScreen() {
     }
     await stopActiveActivity();
     await cancelActivePlannedNotification();
+    await dismissActiveActivityNotification();
     await refresh(date);
   };
 
@@ -65,9 +67,10 @@ export default function HomeScreen() {
     }
     const block = blocks.find((item) => item.id === blockId);
     if (!block) return;
-    await startActivity({ date, title: block.title, categoryId: block.categoryId, plannedBlockId: block.id });
+    const log = await startActivity({ date, title: block.title, categoryId: block.categoryId, plannedBlockId: block.id });
     await cancelActivePlannedNotification();
     await cancelPlannedBlockNotification(block);
+    await showActiveActivityNotification(log);
     await refresh(date);
   };
 
@@ -82,8 +85,9 @@ export default function HomeScreen() {
         return;
       }
       const parsed = manualActivityInputSchema.parse({ title: manualTitle, categoryId: manualCategoryId });
-      await startActivity({ date, title: parsed.title, categoryId: parsed.categoryId });
+      const log = await startActivity({ date, title: parsed.title, categoryId: parsed.categoryId });
       await cancelActivePlannedNotification();
+      await showActiveActivityNotification(log);
       setManualTitle("");
       await refresh(date);
     } catch (error) {

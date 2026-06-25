@@ -1,6 +1,7 @@
 import { useFocusEffect } from "expo-router";
-import { useCallback, useMemo, useRef, useState } from "react";
-import { Alert, Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Alert, Keyboard, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Button } from "@/components/Button";
 import { Card } from "@/components/Card";
 import { Field } from "@/components/Field";
@@ -44,6 +45,26 @@ const emptyDraft = (categoryId = "job"): TemplateDraft => ({
 });
 
 const blockEndMinute = (startMinute: number, endMinute: number) => (endMinute <= startMinute ? endMinute + 24 * 60 : endMinute);
+
+const useAndroidKeyboardInset = () => {
+  const [keyboardInset, setKeyboardInset] = useState(0);
+
+  useEffect(() => {
+    if (Platform.OS !== "android") return;
+    const show = Keyboard.addListener("keyboardDidShow", (event) => {
+      setKeyboardInset(event.endCoordinates.height);
+    });
+    const hide = Keyboard.addListener("keyboardDidHide", () => {
+      setKeyboardInset(0);
+    });
+    return () => {
+      show.remove();
+      hide.remove();
+    };
+  }, []);
+
+  return keyboardInset;
+};
 
 export default function TemplatesScreen() {
   const { categories } = useAppStore();
@@ -280,11 +301,25 @@ function TemplateBlockModal({
   onClose: () => void;
   onSave: () => void;
 }) {
+  const insets = useSafeAreaInsets();
+  const keyboardInset = useAndroidKeyboardInset();
+  const { height: windowHeight } = useWindowDimensions();
+  const cardMaxHeight = keyboardInset ? windowHeight - keyboardInset - Math.max(insets.top, 12) - 12 : windowHeight * 0.88;
   if (!draft) return null;
   return (
     <Modal visible transparent animationType="slide" onRequestClose={onClose}>
-      <View style={styles.modalBackdrop}>
-        <View style={styles.modalCard}>
+      <KeyboardAvoidingView behavior="padding" enabled={Platform.OS === "ios"} style={styles.modalBackdrop}>
+        <View
+          style={[
+            styles.modalCard,
+            {
+              marginBottom: Platform.OS === "android" ? keyboardInset : 0,
+              maxHeight: cardMaxHeight,
+              paddingBottom: Math.max(insets.bottom, 16),
+            },
+          ]}
+        >
+          <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.modalScrollContent}>
           <Text style={styles.title}>{draft.id ? "템플릿 블록 편집" : "새 템플릿 블록"}</Text>
           <Field label="제목" value={draft.title} onChangeText={(title) => onChange({ ...draft, title })} placeholder="업무 정리" />
           <View style={styles.timeRow}>
@@ -306,8 +341,9 @@ function TemplateBlockModal({
           </View>
           <Button title="저장" onPress={onSave} disabled={!draft.title.trim()} />
           <Button title="닫기" onPress={onClose} variant="secondary" />
+          </ScrollView>
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
@@ -361,6 +397,10 @@ const styles = StyleSheet.create({
     gap: 10,
     maxHeight: "88%",
     padding: 16,
+  },
+  modalScrollContent: {
+    gap: 10,
+    paddingBottom: 8,
   },
   timeRow: {
     flexDirection: "row",
